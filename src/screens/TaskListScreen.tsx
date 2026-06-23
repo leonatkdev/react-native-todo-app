@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,19 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getTodos, deleteTodo, updateTodo, getApiId } from '../services/api';
 import { getTasks, setTasks, removeTask, updateTask, watchTasks } from '../store/taskStore';
 import { TaskListScreenProps } from '../types/navigation';
 import { Task, FilterType } from '../types/task';
 import { useToast } from '../components/Toast';
+import { useTheme } from '../hooks/useTheme';
 
 const getEmptyState = (filter: FilterType): { title: string; hint: string } => {
   switch (filter) {
@@ -35,10 +41,14 @@ const FILTERS: { key: FilterType; label: string }[] = [
 
 const TaskListScreen = ({ navigation }: TaskListScreenProps) => {
   const { showToast } = useToast();
+  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const searchRef = useRef<TextInput>(null);
   const [tasks, setLocalTasks] = useState<Task[]>(() => getTasks());
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchTasks = async (isRefresh: boolean) => {
     try {
@@ -81,55 +91,71 @@ const TaskListScreen = ({ navigation }: TaskListScreenProps) => {
     ]);
   };
 
+  const activeCount = tasks.filter(task => !task.completed).length;
   const completedCount = tasks.filter(task => task.completed).length;
+
+  const filterCounts: Record<FilterType, number> = {
+    all: tasks.length,
+    active: activeCount,
+    done: completedCount,
+  };
+
   const filtered = tasks.filter(task => {
-    if (filter === 'active') return !task.completed;
-    if (filter === 'done') return task.completed;
+    if (filter === 'active' && task.completed) return false;
+    if (filter === 'done' && !task.completed) return false;
+    if (searchQuery.trim()) {
+      return task.title.toLowerCase().includes(searchQuery.toLowerCase());
+    }
     return true;
   });
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#8E8E93" />
+      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.tertiaryLabel} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <View style={styles.segmentedWrap}>
-        <View style={styles.segmented}>
+        <View style={[styles.segmented, { backgroundColor: colors.surfaceSecondary }]}>
           {FILTERS.map(f => (
             <TouchableOpacity
               key={f.key}
-              style={[styles.segment, filter === f.key && styles.segmentActive]}
+              style={[styles.segment, filter === f.key && styles.segmentActive, filter === f.key && { backgroundColor: colors.surface }]}
               onPress={() => setFilter(f.key)}
             >
-              <Text style={[styles.segmentText, filter === f.key && styles.segmentTextActive]}>
-                {f.label}
-              </Text>
+              <View style={styles.segmentInner}>
+                <Text style={[styles.segmentText, { color: colors.secondaryLabel }, filter === f.key && { color: colors.label, fontWeight: '600' }]}>
+                  {f.label}
+                </Text>
+                <Text style={[styles.segmentBadge, { color: colors.tertiaryLabel }, filter === f.key && { color: colors.secondaryLabel }]}>
+                  {filterCounts[f.key]}
+                </Text>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
       </View>
-
-      {tasks.length > 0 && (
-        <Text style={styles.statsText}>{completedCount} of {tasks.length} completed</Text>
-      )}
 
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
         contentContainerStyle={filtered.length === 0 ? styles.listEmpty : styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => fetchTasks(true)} tintColor="#8E8E93" />
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchTasks(true)} tintColor={colors.tertiaryLabel} />
         }
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: colors.separator }]} />}
         renderItem={({ item, index }) => (
           <TouchableOpacity
             style={[
               styles.row,
+              { backgroundColor: colors.surface },
               index === 0 && styles.rowFirst,
               index === filtered.length - 1 && styles.rowLast,
             ]}
@@ -140,12 +166,12 @@ const TaskListScreen = ({ navigation }: TaskListScreenProps) => {
               onPress={() => handleToggle(item)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
+              <View style={[styles.checkbox, { borderColor: colors.quaternaryLabel }, item.completed && { backgroundColor: colors.success, borderColor: colors.success }]}>
                 {item.completed && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
               </View>
             </TouchableOpacity>
 
-            <Text style={[styles.taskTitle, item.completed && styles.taskTitleDone]} numberOfLines={2}>
+            <Text style={[styles.taskTitle, { color: colors.label }, item.completed && { color: colors.tertiaryLabel, textDecorationLine: 'line-through' }]} numberOfLines={2}>
               {item.title}
             </Text>
 
@@ -154,63 +180,72 @@ const TaskListScreen = ({ navigation }: TaskListScreenProps) => {
                 onPress={() => handleDelete(item)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="trash-outline" size={20} color="#C7C7CC" />
+                <Ionicons name="trash-outline" size={20} color={colors.quaternaryLabel} />
               </TouchableOpacity>
-              <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+              <Ionicons name="chevron-forward" size={20} color={colors.quaternaryLabel} />
             </View>
           </TouchableOpacity>
         )}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>{getEmptyState(filter).title}</Text>
-            <Text style={styles.emptyHint}>{getEmptyState(filter).hint}</Text>
+            <Text style={[styles.emptyTitle, { color: colors.label }]}>{getEmptyState(filter).title}</Text>
+            <Text style={[styles.emptyHint, { color: colors.tertiaryLabel }]}>{getEmptyState(filter).hint}</Text>
           </View>
         }
       />
-    </View>
+
+      <BlurView
+        intensity={80}
+        tint={isDark ? 'dark' : 'light'}
+        style={[styles.searchBar, { borderTopColor: colors.separatorOpaque, paddingBottom: insets.bottom + 8 }]}
+      >
+        <TouchableOpacity style={[styles.searchInner, { backgroundColor: colors.searchPill }]} onPress={() => searchRef.current?.focus()} activeOpacity={1}>
+          <Ionicons name="search" size={16} color={colors.tertiaryLabel} />
+          <TextInput
+            ref={searchRef}
+            style={[styles.searchInput, { color: colors.label }]}
+            placeholder="Search"
+            placeholderTextColor={colors.tertiaryLabel}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </TouchableOpacity>
+      </BlurView>
+    </KeyboardAvoidingView>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F2F2F7' },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   segmentedWrap: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   segmented: {
     flexDirection: 'row',
-    backgroundColor: '#E5E5EA',
     borderRadius: 9,
     padding: 2,
   },
   segment: { flex: 1, paddingVertical: 7, borderRadius: 7, alignItems: 'center' },
   segmentActive: {
-    backgroundColor: '#FFFFFF',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
   },
-  segmentText: { fontSize: 13, fontWeight: '500', color: '#3C3C43' },
-  segmentTextActive: { fontSize: 13, fontWeight: '600', color: '#000000' },
-
-  statsText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 2,
-  },
-
+  segmentInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  segmentText: { fontSize: 13, fontWeight: '500' },
+  segmentBadge: { fontSize: 13, fontWeight: '500' },
   list: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 },
-  listEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  listEmpty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
 
-  separator: { height: 0.5, backgroundColor: '#E5E5EA', marginLeft: 50 },
+  separator: { height: 0.5, marginLeft: 50 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingVertical: 13,
     gap: 12,
@@ -223,21 +258,38 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 1.5,
-    borderColor: '#C7C7CC',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  checkboxChecked: { backgroundColor: '#34C759', borderColor: '#34C759' },
 
-  taskTitle: { flex: 1, fontSize: 16, color: '#000000' },
-  taskTitleDone: { color: '#8E8E93', textDecorationLine: 'line-through' },
+  taskTitle: { flex: 1, fontSize: 16 },
 
   rowTrailing: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 },
 
   emptyBox: { alignItems: 'center', gap: 8 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', color: '#000000' },
-  emptyHint: { fontSize: 15, color: '#8E8E93', textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { fontSize: 17, fontWeight: '600' },
+  emptyHint: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+
+  searchBar: {
+    borderTopWidth: 0.5,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    overflow: 'hidden',
+  },
+  searchInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 24,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
 });
 
 export default TaskListScreen;

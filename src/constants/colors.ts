@@ -1,0 +1,36 @@
+export const Colors = {
+  light: {
+    background: '#F2F2F7',
+    surface: '#FFFFFF',
+    surfaceSecondary: '#E5E5EA',
+    separator: '#E5E5EA',
+    separatorOpaque: '#C6C6C8',
+    label: '#000000',
+    secondaryLabel: '#3C3C43',
+    tertiaryLabel: '#8E8E93',
+    quaternaryLabel: '#C7C7CC',
+    tint: '#007AFF',
+    destructive: '#FF3B30',
+    success: '#34C759',
+    warning: '#FF9500',
+    searchPill: 'rgba(120,120,128,0.16)',
+  },
+  dark: {
+    background: '#000000',
+    surface: '#1C1C1E',
+    surfaceSecondary: '#2C2C2E',
+    separator: '#38383A',
+    separatorOpaque: '#545456',
+    label: '#FFFFFF',
+    secondaryLabel: '#EBEBF5',
+    tertiaryLabel: '#8E8E93',
+    quaternaryLabel: '#545458',
+    tint: '#0A84FF',
+    destructive: '#FF453A',
+    success: '#30D158',
+    warning: '#FF9F0A',
+    searchPill: 'rgba(120,120,128,0.24)',
+  },
+};
+
+export type AppColors = typeof Colors.light;

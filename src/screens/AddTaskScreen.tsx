@@ -16,6 +16,7 @@ import { addTodo } from '../services/api';
 import { addTask } from '../store/taskStore';
 import { AddTaskScreenProps } from '../types/navigation';
 import { useToast } from '../components/Toast';
+import { useTheme } from '../hooks/useTheme';
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 100;
@@ -23,6 +24,7 @@ const TITLE_MAX = 100;
 const AddTaskScreen = ({ navigation }: AddTaskScreenProps) => {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { colors } = useTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [titleError, setTitleError] = useState('');
@@ -72,7 +74,7 @@ const AddTaskScreen = ({ navigation }: AddTaskScreenProps) => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
@@ -80,18 +82,21 @@ const AddTaskScreen = ({ navigation }: AddTaskScreenProps) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-
-      
-        <Text style={styles.fieldLabel}>
-          <Ionicons name="folder-open-outline" size={16} color="#8E8E93" />
+        <Text style={[styles.fieldLabel, { color: colors.tertiaryLabel }]}>
+          <Ionicons name="folder-open-outline" size={16} color={colors.tertiaryLabel} />
           {' TITLE '}
           <Text style={styles.required}>*</Text>
         </Text>
-        <View style={[styles.card, titleFocused && styles.cardFocused, titleError ? styles.cardError : null]}>
+        <View style={[
+          styles.card,
+          { backgroundColor: colors.surface },
+          titleFocused && { borderColor: colors.tint, shadowOpacity: 0.1 },
+          !!titleError && { borderColor: colors.destructive },
+        ]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: colors.label }]}
             placeholder="What needs to be done?"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={colors.quaternaryLabel}
             value={title}
             onChangeText={handleTitleChange}
             onFocus={() => setTitleFocused(true)}
@@ -104,25 +109,28 @@ const AddTaskScreen = ({ navigation }: AddTaskScreenProps) => {
         </View>
         <View style={styles.fieldFooter}>
           {titleError
-            ? <Text style={styles.errorText}>{titleError}</Text>
+            ? <Text style={[styles.errorText, { color: colors.destructive }]}>{titleError}</Text>
             : <View />
           }
-          <Text style={[styles.charCount, title.length >= TITLE_MAX * 0.85 && styles.charCountWarn]}>
+          <Text style={[styles.charCount, { color: colors.quaternaryLabel }, title.length >= TITLE_MAX * 0.85 && { color: colors.warning }]}>
             {title.length}/{TITLE_MAX}
           </Text>
         </View>
 
-
-        <Text style={[styles.fieldLabel, styles.fieldLabelSpaced]}>
-          <Ionicons name="document-text-outline" size={16} color="#8E8E93" />
+        <Text style={[styles.fieldLabel, styles.fieldLabelSpaced, { color: colors.tertiaryLabel }]}>
+          <Ionicons name="document-text-outline" size={16} color={colors.tertiaryLabel} />
           {' DESCRIPTION'}
         </Text>
-        <View style={[styles.card, descFocused && styles.cardFocused]}>
+        <View style={[
+          styles.card,
+          { backgroundColor: colors.surface },
+          descFocused && { borderColor: colors.tint, shadowOpacity: 0.1 },
+        ]}>
           <TextInput
             ref={descRef}
-            style={[styles.input, styles.inputMulti]}
+            style={[styles.input, styles.inputMulti, { color: colors.label }]}
             placeholder="Add notes or details (optional)"
-            placeholderTextColor="#C7C7CC"
+            placeholderTextColor={colors.quaternaryLabel}
             value={description}
             onChangeText={setDescription}
             onFocus={() => setDescFocused(true)}
@@ -133,13 +141,11 @@ const AddTaskScreen = ({ navigation }: AddTaskScreenProps) => {
             textAlignVertical="top"
           />
         </View>
-
       </ScrollView>
 
-      {/* Pinned bottom button */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.separator, paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TouchableOpacity
-          style={[styles.button, !canSubmit && styles.buttonDisabled]}
+          style={[styles.button, { backgroundColor: colors.tint }, !canSubmit && styles.buttonDisabled]}
           onPress={handleSubmit}
           disabled={!canSubmit}
           activeOpacity={0.75}
@@ -159,13 +165,12 @@ const AddTaskScreen = ({ navigation }: AddTaskScreenProps) => {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F2F2F7' },
+  root: { flex: 1 },
   scroll: { padding: 20, paddingTop: 28, paddingBottom: 12 },
 
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8E8E93',
     letterSpacing: 0.6,
     marginBottom: 8,
     paddingHorizontal: 4,
@@ -175,7 +180,6 @@ const styles = StyleSheet.create({
   required: { color: '#FF3B30' },
 
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 16,
     borderWidth: 1.5,
@@ -186,19 +190,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  cardFocused: {
-    borderColor: '#007AFF',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  cardError: {
-    borderColor: '#FF3B30',
-  },
 
   input: {
     fontSize: 16,
-    color: '#000000',
     paddingVertical: 14,
   },
   inputMulti: { height: 130, paddingTop: 14 },
@@ -211,19 +205,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
     minHeight: 18,
   },
-  errorText: { fontSize: 12, color: '#FF3B30' },
-  charCount: { fontSize: 12, color: '#C7C7CC' },
-  charCountWarn: { color: '#FF9500' },
+  errorText: { fontSize: 12 },
+  charCount: { fontSize: 12 },
 
   bottomBar: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    backgroundColor: '#F2F2F7',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E5EA',
   },
   button: {
-    backgroundColor: '#007AFF',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
